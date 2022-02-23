@@ -1,5 +1,5 @@
 import 'dart:convert';
-
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -34,19 +34,7 @@ class _BestSellersPageState extends State<BestSellersPage> {
           future: futureBook,
           builder: (context, snapshot) {
             if (snapshot.hasData) {
-
-              // List of best sellers
-              return ListView.separated(
-                padding: const EdgeInsets.all(8),
-                itemCount: snapshot.data!.length,
-                itemBuilder: (BuildContext context, int index) {
-                  return Container(
-                    height: 50,
-                    child: Center(child: Text(snapshot.data![index].title)),
-                  );
-                },
-                separatorBuilder: (BuildContext context, int index) => const Divider(),
-              );
+              return bookListBuilder(context, snapshot.data!);
 
             // error handling
             } else if (snapshot.hasError) {
@@ -62,23 +50,98 @@ class _BestSellersPageState extends State<BestSellersPage> {
   }
 }
 
+/// Build list of books
+ListView bookListBuilder(context, List<Book> bookList) {
+  // List of best sellers
+  return ListView.builder(
+    padding: const EdgeInsets.all(8),
+    itemCount: bookList.length,
+    itemBuilder: (BuildContext context, int index) {
+      return ExpansionTile(
+        leading: Text(bookList[index].rank.toString()),
+        title: Text(bookList[index].title),
+        subtitle: Text("by " + bookList[index].author),
+        children: [
+          bookDescriptionBuilder(context, bookList[index])
+        ],
+      );
+    },
+  );
+}
+
+/// Build description of each book
+ListView bookDescriptionBuilder(context, Book book) {
+  return ListView(
+    shrinkWrap: true,
+    children: [
+      ListTile(
+        title: Text('Description'),
+        subtitle: Text(book.description),
+      ),
+
+      // Buy Links
+      ListView.builder(
+        shrinkWrap: true,
+        itemCount: book.buyLinks.length,
+        itemBuilder: (BuildContext context, int index) {
+          return ListTile(
+            title: Text(book.buyLinks[index].name),
+            subtitle: InkWell(
+              child: new Text("Link"),
+              onTap: () => launch(book.buyLinks[index].url)
+            ),
+          );
+      })
+    ],
+  );
+}
+
 /// Book Class to hold book information from API
 class Book {
   final int rank;
   final String title;
   final String author;
+  final String description;
+
+  final List<BuyLink> buyLinks;
+
 
   const Book({
     required this.rank,
     required this.title,
-    required this.author
+    required this.author,
+    required this.description,
+    required this.buyLinks
   });
 
   factory Book.fromJson(Map<String, dynamic> json) {
     return Book(
         rank: json['rank'],
         title: json['title'],
-        author: json['author']
+        author: json['author'],
+        description: json['description'],
+        buyLinks: List<BuyLink>.from(
+          json["buy_links"]
+              .map((data) => BuyLink.fromJson(data))
+        )
+    );
+  }
+}
+
+/// Represents a buy link item
+class BuyLink {
+  final String name;
+  final String url;
+
+  const BuyLink({
+    required this.name,
+    required this.url
+  });
+
+  factory BuyLink.fromJson(Map<String, dynamic> json) {
+    return BuyLink(
+      name: json['name'],
+      url: json['url']
     );
   }
 }
@@ -92,7 +155,7 @@ Future<List<Book>> fetchBestSellers(category) async {
 
     // Gets list of books from result
     final int numOfResults = json["num_results"];
-    final bookList = List<Book>.filled(numOfResults, Book(rank: -1, title: "", author: ""));
+    final bookList = List<Book>.filled(numOfResults, Book(rank: -1, title: "", author: "", description: "", buyLinks: List<BuyLink>.empty()));
 
     for (int i = 0; i < numOfResults; i++) {
       bookList[i] = Book.fromJson(json["results"]["books"][i]);
