@@ -10,7 +10,7 @@ const String homePage = 'homepage';
 Route<dynamic> controller(RouteSettings settings) {
   switch(settings.name) {
     case bestSellersPage:
-      return MaterialPageRoute(builder: (context) => BestSellersPage());
+      return MaterialPageRoute(builder: (context) => const BestSellersPage());
 
     case homePage:
       return MaterialPageRoute(builder: (context) => HomePage());

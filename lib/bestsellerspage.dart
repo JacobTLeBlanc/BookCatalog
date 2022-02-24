@@ -27,7 +27,7 @@ class _BestSellersPageState extends State<BestSellersPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Best Sellers NYT'),
+        title: const Text('Best Sellers NYT'),
       ),
       body: Center(
         child: FutureBuilder<List<Book>>(
@@ -52,15 +52,20 @@ class _BestSellersPageState extends State<BestSellersPage> {
 
 /// Build list of books
 ListView bookListBuilder(context, List<Book> bookList) {
+
   // List of best sellers
   return ListView.builder(
     padding: const EdgeInsets.all(8),
     itemCount: bookList.length,
     itemBuilder: (BuildContext context, int index) {
+
+      // Expansion tile to show book description
       return ExpansionTile(
         leading: Text(bookList[index].rank.toString()),
-        title: Text(bookList[index].title),
-        subtitle: Text("by " + bookList[index].author),
+        title: Text(bookList[index].title + " by " + bookList[index].author),
+        subtitle: Image(
+          image: NetworkImage(bookList[index].imageUrl)
+        ),
         children: [
           bookDescriptionBuilder(context, bookList[index])
         ],
@@ -71,27 +76,41 @@ ListView bookListBuilder(context, List<Book> bookList) {
 
 /// Build description of each book
 ListView bookDescriptionBuilder(context, Book book) {
+
+  // List of book info
   return ListView(
     shrinkWrap: true,
     children: [
+
+      // Brief description
       ListTile(
-        title: Text('Description'),
-        subtitle: Text(book.description),
+        title: const Text('Description'),
+        subtitle: Container(
+          padding: const EdgeInsets.fromLTRB(0, 16, 0, 16),
+          child: Text(book.description)
+        ),
       ),
 
       // Buy Links
-      ListView.builder(
-        shrinkWrap: true,
-        itemCount: book.buyLinks.length,
-        itemBuilder: (BuildContext context, int index) {
-          return ListTile(
-            title: Text(book.buyLinks[index].name),
-            subtitle: InkWell(
-              child: new Text("Link"),
-              onTap: () => launch(book.buyLinks[index].url)
-            ),
-          );
-      })
+      ListTile(
+        title: const Text("Buy Links"),
+        subtitle: ListView.builder(
+            shrinkWrap: true,
+            itemCount: book.buyLinks.length,
+            itemBuilder: (BuildContext context, int index) {
+
+              // Links
+              return InkWell(
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(0, 16, 0, 16),
+                    child: Text(book.buyLinks[index].name),
+                  ),
+                  onTap: () => launch(book.buyLinks[index].url)
+              );
+            }),
+      )
+
+
     ],
   );
 }
@@ -102,6 +121,7 @@ class Book {
   final String title;
   final String author;
   final String description;
+  final String imageUrl;
 
   final List<BuyLink> buyLinks;
 
@@ -111,6 +131,7 @@ class Book {
     required this.title,
     required this.author,
     required this.description,
+    required this.imageUrl,
     required this.buyLinks
   });
 
@@ -120,6 +141,7 @@ class Book {
         title: json['title'],
         author: json['author'],
         description: json['description'],
+        imageUrl: json["book_image"],
         buyLinks: List<BuyLink>.from(
           json["buy_links"]
               .map((data) => BuyLink.fromJson(data))
@@ -155,7 +177,7 @@ Future<List<Book>> fetchBestSellers(category) async {
 
     // Gets list of books from result
     final int numOfResults = json["num_results"];
-    final bookList = List<Book>.filled(numOfResults, Book(rank: -1, title: "", author: "", description: "", buyLinks: List<BuyLink>.empty()));
+    final bookList = List<Book>.filled(numOfResults, Book(rank: -1, title: "", author: "", description: "",imageUrl: "",  buyLinks: List<BuyLink>.empty()));
 
     for (int i = 0; i < numOfResults; i++) {
       bookList[i] = Book.fromJson(json["results"]["books"][i]);
