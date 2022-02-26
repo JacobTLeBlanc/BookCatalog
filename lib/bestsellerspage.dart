@@ -16,38 +16,90 @@ class BestSellersPage extends StatefulWidget {
 class _BestSellersPageState extends State<BestSellersPage> {
 
   late Future<List<Book>> futureBook;
+  late Future<List<Category>> categories = fetchCategories();
+  String currentEncodedCategory = "young-adult";
+  String currentDisplayCategory = "";
 
   @override
   void initState() {
-    futureBook = fetchBestSellers('young-adult');
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
+    futureBook = fetchBestSellers(currentEncodedCategory);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Best Sellers NYT'),
-      ),
-      body: Center(
-        child: FutureBuilder<List<Book>>(
-          future: futureBook,
+
+        // Gets categories and then
+        title: FutureBuilder<List<Category>>(
+          future: categories,
           builder: (context, snapshot) {
             if (snapshot.hasData) {
-              return bookListBuilder(context, snapshot.data!);
 
-            // error handling
-            } else if (snapshot.hasError) {
-              return Text('${snapshot.error}');
+              List<String> displayNames = new List<String>.filled(snapshot.data!.length, "");
+              for (int i = 0; i < snapshot.data!.length; i++) {
+                displayNames[i] = snapshot.data![i].displayName;
+              }
+
+              return DropdownButton(
+                isExpanded: true,
+                hint: Text(currentDisplayCategory == "" ? "Select category" : currentDisplayCategory),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    currentDisplayCategory = newValue!;
+                    currentEncodedCategory = snapshot.data![displayNames.indexOf(newValue)].encodedName;
+                  });
+                },
+                items: displayNames
+                  .map<DropdownMenuItem<String>>((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                }).toList()
+              );
+            }
+
+            else if (snapshot.hasError) {
+            return Text('${snapshot.error}');
             }
 
             // Loading icon
             return const CircularProgressIndicator();
-          },
-        ),
+
+          }
+        )
       ),
+      body: Container(
+        child: futureBookBuilder(context, futureBook)
+        )
     );
   }
+}
+
+
+
+/// Future Builder
+/// Handles async data
+FutureBuilder<List<Book>> futureBookBuilder(context, futureBook) {
+  return FutureBuilder<List<Book>>(
+    future: futureBook,
+    builder: (context, snapshot) {
+
+      if (snapshot.hasData) {
+        return bookListBuilder(context, snapshot.data!);
+
+        // error handling
+      } else if (snapshot.hasError) {
+        return Text('${snapshot.error}');
+      }
+
+      // Loading icon
+      return const CircularProgressIndicator();
+    },
+  );
 }
 
 /// Build list of books
@@ -55,6 +107,7 @@ ListView bookListBuilder(context, List<Book> bookList) {
 
   // List of best sellers
   return ListView.builder(
+    shrinkWrap: true,
     padding: const EdgeInsets.all(8),
     itemCount: bookList.length,
     itemBuilder: (BuildContext context, int index) {
@@ -80,6 +133,7 @@ ListView bookDescriptionBuilder(context, Book book) {
   // List of book info
   return ListView(
     shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
     children: [
 
       // Brief description
@@ -96,6 +150,7 @@ ListView bookDescriptionBuilder(context, Book book) {
         title: const Text("Buy Links"),
         subtitle: ListView.builder(
             shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
             itemCount: book.buyLinks.length,
             itemBuilder: (BuildContext context, int index) {
 
@@ -177,7 +232,7 @@ Future<List<Book>> fetchBestSellers(category) async {
 
     // Gets list of books from result
     final int numOfResults = json["num_results"];
-    final bookList = List<Book>.filled(numOfResults, Book(rank: -1, title: "", author: "", description: "",imageUrl: "",  buyLinks: List<BuyLink>.empty()));
+    final List<Book> bookList = List<Book>.filled(numOfResults, Book(rank: -1, title: "", author: "", description: "", imageUrl: "",  buyLinks: List<BuyLink>.empty()));
 
     for (int i = 0; i < numOfResults; i++) {
       bookList[i] = Book.fromJson(json["results"]["books"][i]);
@@ -187,4 +242,42 @@ Future<List<Book>> fetchBestSellers(category) async {
   }
 
   throw Exception('Failed to load best sellers');
+}
+
+/// Represents a book category
+class Category {
+  final String displayName;
+  final String encodedName;
+
+  const Category({
+    required this.displayName,
+    required this.encodedName
+  });
+
+  factory Category.fromJson(Map<String, dynamic> json) {
+    return Category(
+        displayName: json["display_name"],
+        encodedName: json["list_name_encoded"]
+    );
+  }
+}
+
+/// Fetches NYT categories
+Future<List<Category>> fetchCategories() async {
+  final response = await http.get(Uri.parse('https://vbtjd5a550.execute-api.us-east-1.amazonaws.com/v1/get_categories_nyt'));
+
+  if (response.statusCode == 200) {
+    Map<String, dynamic> json = jsonDecode(response.body);
+
+    final int numOfResults = json["num_results"];
+    final List<Category> categories = List<Category>.filled(numOfResults, Category(displayName: "", encodedName: ""));
+
+    for (int i = 0; i < numOfResults; i++) {
+      categories[i] = Category.fromJson(json["results"][i]);
+    }
+
+    return categories;
+  }
+
+  throw Exception('Failed to load categories');
 }
